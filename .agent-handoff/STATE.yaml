@@ -1,0 +1,13 @@
+version: 1
+project: clawdmeter
+created_at: 2026-06-03 00:09:30 +0800
+updated_at: '2026-06-03 00:22:24 '
+last_resumed_at: 2026-06-03 00:09:30 +0800
+current_phase: UI 完成，待 BLE 开发
+current_goal: 将 ESP32 Clawdmeter 完整移植到 SiFli
+next_step: BLE GATT 服务移植
+blockers: []
+key_files:
+- .agent-handoff/START-HERE.md
+- .agent-handoff/CURRENT.md
+- .agent-handoff/TASKS.md

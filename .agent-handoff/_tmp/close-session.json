@@ -1,0 +1,127 @@
+{
+  "session": {
+    "started_at": "2026-06-03T00:22:24.060827",
+    "ended_at": "2026-06-03T00:22:24.060827",
+    "focus": "Clawdmeter UI 移植到 SiFli SF32LB52X"
+  },
+  "current_status": {
+    "phase": "UI 完成，待 BLE 开发",
+    "goal": "将 ESP32 Clawdmeter 完整移植到 SiFli",
+    "summary": "UI 部分（3页面+动画+触摸）已完成并验证。BLE 和音频模块待开发。",
+    "next_step": "BLE GATT 服务移植",
+    "blockers": []
+  },
+  "tasks_to_add": [
+    {
+      "title": "BLE GATT 服务移植",
+      "details": "移植 ESP32 clawdmeter_gatt.c 到 SiFli sibles API。UUID: 6c415a55-4465-7669-6365-000000000001。参考 example/ble/peripheral。",
+      "priority": "high"
+    },
+    {
+      "title": "clawdmeter_data 数据模型移植",
+      "details": "线程安全用量数据结构。适配 RT-Thread 临界区。",
+      "priority": "high"
+    },
+    {
+      "title": "Usage/Bluetooth 页面接入真实数据",
+      "details": "进度条、百分比接入 clawdmeter_data。",
+      "priority": "high"
+    },
+    {
+      "title": "MCP 服务端联调验证",
+      "details": "使用 clawdmeter_mcp 与 SiFli BLE 联调。",
+      "priority": "medium"
+    },
+    {
+      "title": "麦克风接口集成",
+      "details": "audio_open() + AUDIO_DEVICE_PDM。参考 example/ble/talkback。",
+      "priority": "low"
+    },
+    {
+      "title": "喇叭接口集成",
+      "details": "audio_write() + AUDIO_DEVICE_SPEAKER。AW8155 GPIO_A42。",
+      "priority": "low"
+    }
+  ],
+  "tasks_to_update": [],
+  "tasks_to_complete": [],
+  "tasks_to_add_and_complete": [
+    {
+      "title": "UI 框架：LVGL scroll snap 页面管理器",
+      "details": "clawdmeter_ui.h/c，3页面并排+scroll snap",
+      "priority": "high",
+      "notes": ""
+    },
+    {
+      "title": "Splash 页面：13个像素动画",
+      "details": "canvas 渲染 20x20，PSRAM 缓冲区",
+      "priority": "high",
+      "notes": ""
+    },
+    {
+      "title": "Usage 页面：用量仪表盘",
+      "details": "Current/Weekly 面板+进度条+spinner",
+      "priority": "high",
+      "notes": "demo 模式"
+    },
+    {
+      "title": "Bluetooth 页面：状态桩",
+      "details": "蓝牙图标+状态标签",
+      "priority": "medium",
+      "notes": ""
+    },
+    {
+      "title": "修复 ft6146 触摸驱动 bug",
+      "details": "stale 坐标+MOVE 事件修复",
+      "priority": "high",
+      "notes": "修改了 sifli-sdk"
+    },
+    {
+      "title": "Logo RGB565A8 转 TCA",
+      "details": "rgb565a8_to_tca.py + logo_tca.h",
+      "priority": "medium",
+      "notes": ""
+    },
+    {
+      "title": "串口工具+README",
+      "details": "serial_monitor.py + README.md",
+      "priority": "low",
+      "notes": ""
+    }
+  ],
+  "decisions_to_add": [
+    {
+      "summary": "LVGL scroll snap 替代手动手势",
+      "rationale": "原生滚动更简洁可靠"
+    },
+    {
+      "summary": "Logo 用 TRUE_COLOR_ALPHA",
+      "rationale": "EPIC 不支持 RGB565A8"
+    },
+    {
+      "summary": "BLE 用 sibles 高层 API",
+      "rationale": "宏封装比原生 GAP/GATT 更简洁"
+    }
+  ],
+  "session_log": {
+    "progress": "1.分析ESP32源码 2.复制资源 3.创建页面管理器 4.修复触摸驱动 5.重构scroll snap 6.Logo格式转换 7.README+串口工具 8.git提交",
+    "files_touched": [
+      "src/clawdmeter_ui.h",
+      "src/clawdmeter_ui.c",
+      "src/clawdmeter_pages.c",
+      "src/main.c",
+      "src/SConscript",
+      "src/clawdmeter_assets/*",
+      "README.md",
+      "serial_monitor.py",
+      "rgb565a8_to_tca.py"
+    ],
+    "risks": [
+      "ft6146 驱动修改在 sifli-sdk 中，SDK 升级可能覆盖",
+      "BLE 未启用，LCPU 固件状态未知"
+    ]
+  },
+  "resume_hint": {
+    "text": "下一步 BLE GATT 服务移植。参考 example/ble/peripheral。ESP32 源码在 esp32s3_axp2101/main/services/clawdmeter_gatt.c。需启用 CONFIG_BSP_USING_BLE=y。"
+  }
+}

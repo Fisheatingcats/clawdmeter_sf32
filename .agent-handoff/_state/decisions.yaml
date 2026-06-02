@@ -1,0 +1,13 @@
+items:
+- decision_id: DEC-001
+  summary: LVGL scroll snap 替代手动手势
+  rationale: 原生滚动更简洁可靠
+  time: '2026-06-03T00:22:27+08:00'
+- decision_id: DEC-002
+  summary: Logo 用 TRUE_COLOR_ALPHA
+  rationale: EPIC 不支持 RGB565A8
+  time: '2026-06-03T00:22:27+08:00'
+- decision_id: DEC-003
+  summary: BLE 用 sibles 高层 API
+  rationale: 宏封装比原生 GAP/GATT 更简洁
+  time: '2026-06-03T00:22:27+08:00'
