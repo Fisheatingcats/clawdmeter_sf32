@@ -9,6 +9,8 @@
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
+#include "clawdmeter_ble.h"
+
 #ifdef PKG_USING_LITTLEVGL2RTT
 #include "littlevgl2rtt.h"
 #include "lvgl.h"
@@ -22,6 +24,10 @@
 int main(void)
 {
     rt_kprintf("ClawdMeter started!\n");
+
+    /* Initialise BLE GATT service (registers after BLE power-on) */
+    cm_ble_init();
+    rt_kprintf("ClawdMeter BLE init\n");
 
 #ifdef PKG_USING_LITTLEVGL2RTT
     rt_err_t ret;
@@ -42,12 +48,16 @@ int main(void)
 
     while (1)
     {
+        /* Process BLE events */
+        cm_ble_poll();
+
         ms = lv_task_handler();
         rt_thread_mdelay(ms > 0 ? ms : 1);
     }
 #else
     while (1)
     {
+        cm_ble_poll();
         rt_thread_mdelay(1000);
         rt_kprintf("ClawdMeter running...\n");
     }
