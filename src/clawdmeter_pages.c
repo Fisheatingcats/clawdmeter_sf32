@@ -27,6 +27,7 @@ LV_FONT_DECLARE(font_mono_32);
  * ════════════════════════════════════════════════════════════════════ */
 
 static lv_img_dsc_t s_icon_bluetooth_dsc;
+static lv_img_dsc_t s_icon_trash2_dsc;
 static lv_img_dsc_t s_logo_dsc;
 static bool         s_img_dsc_ready;
 
@@ -41,6 +42,14 @@ static void ensure_img_dsc_ready(void)
     s_icon_bluetooth_dsc.header.h  = ICON_BLUETOOTH_H;
     s_icon_bluetooth_dsc.data_size = (uint32_t)ICON_BLUETOOTH_W * (uint32_t)ICON_BLUETOOTH_H * sizeof(lv_color_t);
     s_icon_bluetooth_dsc.data      = (const uint8_t *)icon_bluetooth_data;
+
+    /* Trash icon — TRUE_COLOR (RGB565) */
+    memset(&s_icon_trash2_dsc, 0, sizeof(s_icon_trash2_dsc));
+    s_icon_trash2_dsc.header.cf = LV_IMG_CF_TRUE_COLOR;
+    s_icon_trash2_dsc.header.w  = ICON_TRASH2_W;
+    s_icon_trash2_dsc.header.h  = ICON_TRASH2_H;
+    s_icon_trash2_dsc.data_size = (uint32_t)ICON_TRASH2_W * (uint32_t)ICON_TRASH2_H * sizeof(lv_color_t);
+    s_icon_trash2_dsc.data      = (const uint8_t *)icon_trash2_data;
 
     /* Logo — TRUE_COLOR_ALPHA (converted from RGB565A8) */
     memset(&s_logo_dsc, 0, sizeof(s_logo_dsc));
@@ -302,11 +311,24 @@ const cm_page_ops_t cm_page_usage = {
 
 typedef struct {
     lv_obj_t *status;
-    lv_obj_t *enabled;
     lv_obj_t *device;
+    lv_obj_t *address;
 } ble_data_t;
 
 static ble_data_t s_ble;
+
+/* ── BLE stub (no BLE impl yet) ── */
+
+static void ble_clear_bonds(void)
+{
+    rt_kprintf("BLE: clear bonds (stub)\n");
+}
+
+static void ble_reset_click_cb(lv_event_t *e)
+{
+    (void)e;
+    ble_clear_bonds();
+}
 
 static void bluetooth_create(lv_obj_t *parent)
 {
@@ -333,17 +355,40 @@ static void bluetooth_create(lv_obj_t *parent)
     lv_label_set_text(d->status, "Disconnected");
     lv_obj_set_pos(d->status, 62, 8);
 
-    d->enabled = lv_label_create(panel);
-    lv_obj_set_style_text_color(d->enabled, CM_DIM, 0);
-    lv_obj_set_style_text_font(d->enabled, &font_styrene_20, 0);
-    lv_label_set_text(d->enabled, "Enabled: no");
-    lv_obj_set_pos(d->enabled, 0, 64);
-
     d->device = lv_label_create(panel);
     lv_obj_set_style_text_color(d->device, CM_DIM, 0);
     lv_obj_set_style_text_font(d->device, &font_styrene_20, 0);
     lv_label_set_text(d->device, "Device: N/A");
-    lv_obj_set_pos(d->device, 0, 100);
+    lv_obj_set_pos(d->device, 0, 64);
+
+    d->address = lv_label_create(panel);
+    lv_obj_set_style_text_color(d->address, CM_DIM, 0);
+    lv_obj_set_style_text_font(d->address, &font_styrene_20, 0);
+    lv_label_set_text(d->address, "Address: --:--:--:--:--:--");
+    lv_obj_set_pos(d->address, 0, 100);
+
+    /* Reset Bluetooth zone — trash icon + label */
+    lv_obj_t *reset_zone = lv_obj_create(parent);
+    lv_obj_set_pos(reset_zone, 20, 282);
+    lv_obj_set_size(reset_zone, 350, 90);
+    lv_obj_set_style_bg_color(reset_zone, CM_PANEL, 0);
+    lv_obj_set_style_bg_opa(reset_zone, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(reset_zone, 8, 0);
+    lv_obj_set_style_border_width(reset_zone, 0, 0);
+    lv_obj_set_style_pad_column(reset_zone, 14, 0);
+    lv_obj_set_flex_flow(reset_zone, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(reset_zone, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(reset_zone, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(reset_zone, ble_reset_click_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *trash_img = lv_img_create(reset_zone);
+    lv_img_set_src(trash_img, &s_icon_trash2_dsc);
+
+    lv_obj_t *reset_lbl = lv_label_create(reset_zone);
+    lv_label_set_text(reset_lbl, "Reset Bluetooth");
+    lv_obj_set_style_text_font(reset_lbl, &font_styrene_20, 0);
+    lv_obj_set_style_text_color(reset_lbl, CM_DIM, 0);
 
     lv_obj_t *credit = lv_label_create(parent);
     lv_obj_set_style_text_color(credit, CM_DIM, 0);

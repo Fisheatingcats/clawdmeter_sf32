@@ -4,6 +4,8 @@
 
 上游项目的 MCP 服务端已适配：[Fisheatingcats/clawdmeter_mcp](https://github.com/Fisheatingcats/clawdmeter_mcp)
 
+> 📋 更新日志见 [CHANGELOG.md](CHANGELOG.md)
+
 ## 项目简介
 
 Clawdmeter 是一个运行在手表/小屏设备上的 **AI Agent 用量监控器**，通过 BLE 与电脑端 MCP 服务器通信，实时显示：
@@ -47,7 +49,8 @@ Clawdmeter 是一个运行在手表/小屏设备上的 **AI Agent 用量监控�
 ### 3. Bluetooth — 连接状态
 
 - 蓝牙图标 + 连接状态（Connected / Advertising / Disconnected）
-- 设备名称、启用状态
+- 设备名称、MAC 地址
+- 重置蓝牙按钮（垃圾桶图标 + "Reset Bluetooth"，点击清除配对并重新广播）
 - 底部版本信息
 
 ## 硬件平台
@@ -79,7 +82,7 @@ clawdmeter/
 │   │   ├── font_styrene_*.c        # Styrene 字体 (14/16/20/24/28/48px)
 │   │   ├── font_tiempos_*.c        # Tiempos 字体 (34/56px)
 │   │   ├── font_mono_32.c          # Mono 字体 (32px)
-│   │   ├── icons.h                 # 蓝牙图标 (48×48 RGB565)
+│   │   ├── icons.h                 # 蓝牙 + 垃圾桶 + 电池图标 (48×48)
 │   │   ├── splash_animations.h     # 13 个像素动画数据
 │   │   └── logo.h                  # Logo (80×80 RGB565A8，暂未使用)
 │   └── SConscript                  # 源文件构建脚本
