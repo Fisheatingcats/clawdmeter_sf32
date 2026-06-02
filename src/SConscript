@@ -1,0 +1,17 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+# Main application sources
+src = Glob('*.c')
+
+# Font sources from clawdmeter_assets directory
+src += Glob('clawdmeter_assets/*.c')
+
+# Include paths: current dir (for clawdmeter_ui.h) and assets dir (for logo.h, icons.h, etc.)
+CPPPATH = [cwd, os.path.join(cwd, 'clawdmeter_assets')]
+
+group = DefineGroup('Applications', src, depend=[''], CPPPATH=CPPPATH)
+
+Return('group')

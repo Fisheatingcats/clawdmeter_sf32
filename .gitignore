@@ -1,0 +1,14 @@
+# Build output
+**/build_*/
+**/__pycache__/
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+*.dblite
+
+# IDE
+.vscode/
+*.swp
+*.bak
