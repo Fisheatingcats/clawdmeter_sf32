@@ -8,7 +8,7 @@
 
 /* ── Asset includes ── */
 #include "clawdmeter_assets/icons.h"
-/* logo.h uses RGB565A8 format — not supported by SiFli v8 EPIC decoder */
+#include "clawdmeter_assets/logo_tca.h"
 #include "clawdmeter_assets/splash_animations.h"
 
 /* ── Custom font declarations ── */
@@ -27,17 +27,29 @@ LV_FONT_DECLARE(font_mono_32);
  * ════════════════════════════════════════════════════════════════════ */
 
 static lv_img_dsc_t s_icon_bluetooth_dsc;
+static lv_img_dsc_t s_logo_dsc;
 static bool         s_img_dsc_ready;
 
 static void ensure_img_dsc_ready(void)
 {
     if (s_img_dsc_ready) return;
+
+    /* Bluetooth icon — TRUE_COLOR (RGB565) */
     memset(&s_icon_bluetooth_dsc, 0, sizeof(s_icon_bluetooth_dsc));
     s_icon_bluetooth_dsc.header.cf = LV_IMG_CF_TRUE_COLOR;
     s_icon_bluetooth_dsc.header.w  = ICON_BLUETOOTH_W;
     s_icon_bluetooth_dsc.header.h  = ICON_BLUETOOTH_H;
     s_icon_bluetooth_dsc.data_size = (uint32_t)ICON_BLUETOOTH_W * (uint32_t)ICON_BLUETOOTH_H * sizeof(lv_color_t);
     s_icon_bluetooth_dsc.data      = (const uint8_t *)icon_bluetooth_data;
+
+    /* Logo — TRUE_COLOR_ALPHA (converted from RGB565A8) */
+    memset(&s_logo_dsc, 0, sizeof(s_logo_dsc));
+    s_logo_dsc.header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    s_logo_dsc.header.w  = LOGO_TCA_WIDTH;
+    s_logo_dsc.header.h  = LOGO_TCA_HEIGHT;
+    s_logo_dsc.data_size = (uint32_t)LOGO_TCA_WIDTH * (uint32_t)LOGO_TCA_HEIGHT * 3U;
+    s_logo_dsc.data      = logo_tca_data;
+
     s_img_dsc_ready = true;
 }
 
@@ -129,12 +141,6 @@ static void splash_create(lv_obj_t *parent)
         lv_label_set_text(lbl, "Clawdmeter\ncanvas alloc failed");
         lv_obj_center(lbl);
     }
-
-    lv_obj_t *title = lv_label_create(parent);
-    lv_obj_set_style_text_color(title, CM_TEXT, 0);
-    lv_obj_set_style_text_font(title, &font_styrene_24, 0);
-    lv_label_set_text(title, "Clawdmeter");
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 18);
 }
 
 static void splash_tick(uint32_t elapsed_ms)
@@ -235,21 +241,12 @@ static void usage_create(lv_obj_t *parent)
     usage_data_t *d = &s_usage;
     memset(d, 0, sizeof(*d));
 
-    /* Logo placeholder */
-    lv_obj_t *logo_bg = lv_obj_create(parent);
-    lv_obj_set_pos(logo_bg, 20, 20);
-    lv_obj_set_size(logo_bg, 60, 60);
-    lv_obj_set_style_bg_color(logo_bg, CM_ACCENT, 0);
-    lv_obj_set_style_bg_opa(logo_bg, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(logo_bg, 12, 0);
-    lv_obj_set_style_border_width(logo_bg, 0, 0);
-    lv_obj_clear_flag(logo_bg, LV_OBJ_FLAG_SCROLLABLE);
+    ensure_img_dsc_ready();
 
-    lv_obj_t *logo_lbl = lv_label_create(logo_bg);
-    lv_obj_set_style_text_color(logo_lbl, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(logo_lbl, &font_styrene_24, 0);
-    lv_label_set_text(logo_lbl, "CM");
-    lv_obj_center(logo_lbl);
+    /* Logo */
+    lv_obj_t *logo = lv_img_create(parent);
+    lv_img_set_src(logo, &s_logo_dsc);
+    lv_obj_set_pos(logo, 20, 20);
 
     lv_obj_t *title = lv_label_create(parent);
     lv_obj_set_style_text_color(title, CM_TEXT, 0);
