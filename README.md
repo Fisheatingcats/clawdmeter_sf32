@@ -111,6 +111,15 @@ scons --board=sf32lb52-lchspi-ulp -j8
 .\build_and_uart_download.ps1 -ComPort COM21
 ```
 
+### 配置（menuconfig）
+
+```powershell
+cd projects/clawdmeter/project
+scons --board=sf32lb52-lchspi-ulp --menuconfig
+```
+
+> ⚠️ 必须带 `--board` 参数，否则 SCons 无法加载 board 配置，会报 `AttributeError`。
+
 ### 烧录
 
 ```powershell

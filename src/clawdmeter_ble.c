@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef BSP_USING_BLE
+#ifdef CONFIG_BLUETOOTH
 
 #include "bf0_ble_gap.h"
 #include "bf0_sibles.h"
@@ -392,7 +392,7 @@ ble_common_update_type_t ble_request_public_address(bd_addr_t *addr)
 }
 #endif
 
-#else /* !BSP_USING_BLE */
+#else /* !CONFIG_BLUETOOTH */
 
 /* ── Stubs when BLE is not enabled ── */
 
@@ -403,4 +403,4 @@ bool cm_ble_is_connected(void)  { return false; }
 const char *cm_ble_device_name(void) { return "Clawdmeter"; }
 void cm_ble_poll(void) {}
 
-#endif /* BSP_USING_BLE */
+#endif /* CONFIG_BLUETOOTH */
