@@ -112,6 +112,7 @@ static uint8_t    s_req_config;  /* CCCD value for Request */
 static char       s_last_tx[24] = "{}";
 static bool       s_initialized;
 static char       s_dev_name[32] = "Clawdmeter";
+static char       s_address[20] = "";  /* "XX:XX:XX:XX:XX:XX" */
 
 static rt_mailbox_t s_ble_mb;
 
@@ -275,12 +276,32 @@ static void cm_ble_start_advertising(void)
 {
     sibles_advertising_para_t para = {0};
 
+    /* Get and format MAC address */
+    bd_addr_t addr;
+    if (ble_get_public_address(&addr) == HL_ERR_NO_ERROR) {
+        rt_snprintf(s_address, sizeof(s_address), "%02X:%02X:%02X:%02X:%02X:%02X",
+                    addr.addr[0], addr.addr[1], addr.addr[2],
+                    addr.addr[3], addr.addr[4], addr.addr[5]);
+    }
+
+    /* Build device name with MAC suffix for uniqueness */
+    char local_name[32];
+    if (s_address[0]) {
+        rt_snprintf(local_name, sizeof(local_name), "Clawdmeter-%02X%02X",
+                    addr.addr[4], addr.addr[5]);
+    } else {
+        memcpy(local_name, "Clawdmeter", 11);
+    }
+    memcpy(s_dev_name, local_name, sizeof(s_dev_name));
+
     /* Set device name */
     ble_gap_dev_name_t *dn = rt_malloc(sizeof(ble_gap_dev_name_t) + strlen(s_dev_name));
     dn->len = (uint8_t)strlen(s_dev_name);
     memcpy(dn->name, s_dev_name, dn->len);
     ble_gap_set_dev_name(dn);
     rt_free(dn);
+
+    LOG_I("BLE name: %s, addr: %s", s_dev_name, s_address);
 
     para.own_addr_type = GAPM_STATIC_ADDR;
     para.config.adv_mode = SIBLES_ADV_CONNECT_MODE;
@@ -358,6 +379,11 @@ const char *cm_ble_device_name(void)
     return s_dev_name;
 }
 
+const char *cm_ble_address(void)
+{
+    return s_address[0] ? s_address : "--:--:--:--:--:--";
+}
+
 /* ════════════════════════════════════════════════════════════════════
  *  BLE mailbox polling (called from main loop or dedicated thread)
  * ════════════════════════════════════════════════════════════════════ */
@@ -401,6 +427,7 @@ int  cm_ble_send_json(const char *json) { (void)json; return -1; }
 void cm_ble_request_refresh(void) {}
 bool cm_ble_is_connected(void)  { return false; }
 const char *cm_ble_device_name(void) { return "Clawdmeter"; }
+const char *cm_ble_address(void) { return "--:--:--:--:--:--"; }
 void cm_ble_poll(void) {}
 
 #endif /* CONFIG_BLUETOOTH */

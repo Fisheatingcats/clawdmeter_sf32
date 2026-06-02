@@ -360,7 +360,7 @@ static void bluetooth_create(lv_obj_t *parent)
     d->device = lv_label_create(panel);
     lv_obj_set_style_text_color(d->device, CM_DIM, 0);
     lv_obj_set_style_text_font(d->device, &font_styrene_20, 0);
-    lv_label_set_text_fmt(d->device, "Device: %s", cm_ble_device_name());
+    lv_label_set_text(d->device, "Device: ...");
     lv_obj_set_pos(d->device, 0, 64);
 
     d->address = lv_label_create(panel);
@@ -404,6 +404,7 @@ static void bluetooth_tick(uint32_t elapsed_ms)
     ble_data_t *d = &s_ble;
     (void)elapsed_ms;
 
+    /* Update connection status */
     if (cm_ble_is_connected()) {
         lv_label_set_text(d->status, "Connected");
         lv_obj_set_style_text_color(d->status, CM_GREEN, 0);
@@ -411,6 +412,10 @@ static void bluetooth_tick(uint32_t elapsed_ms)
         lv_label_set_text(d->status, "Advertising");
         lv_obj_set_style_text_color(d->status, CM_AMBER, 0);
     }
+
+    /* Update device name and address */
+    lv_label_set_text_fmt(d->device, "Device: %s", cm_ble_device_name());
+    lv_label_set_text_fmt(d->address, "Address: %s", cm_ble_address());
 }
 
 const cm_page_ops_t cm_page_bluetooth = {

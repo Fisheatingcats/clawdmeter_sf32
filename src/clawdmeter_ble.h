@@ -27,9 +27,15 @@ void cm_ble_request_refresh(void);
 bool cm_ble_is_connected(void);
 
 /**
- * Get the current BLE device name.
+ * Get the current BLE device name (set after advertising starts).
  */
 const char *cm_ble_device_name(void);
+
+/**
+ * Get the BLE MAC address as "XX:XX:XX:XX:XX:XX" string.
+ * Returns empty string if not yet available.
+ */
+const char *cm_ble_address(void);
 
 /**
  * Process BLE events from the mailbox. Call periodically.
