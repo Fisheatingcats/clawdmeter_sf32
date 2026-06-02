@@ -8,6 +8,9 @@
 *.map
 *.dblite
 
+# Agent handoff
+.agent-handoff/
+
 # IDE
 .vscode/
 *.swp
