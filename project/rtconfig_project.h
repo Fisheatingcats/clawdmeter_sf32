@@ -17,4 +17,17 @@
 
 #endif /* end of _MSC_VER */
 
+/* BLE host configuration. Keep this HCPU-only; LCPU builds the controller image. */
+#if defined(BF0_HCPU)
+#ifndef BLUETOOTH
+#define BLUETOOTH           1
+#endif
+#ifndef CFG_BLE
+#define CFG_BLE             1
+#endif
+#ifndef BSP_BLE_SIBLES
+#define BSP_BLE_SIBLES      1
+#endif
+#endif
+
 #endif

@@ -14,6 +14,9 @@ PrepareEnv()
 # Add bootloader project
 AddBootLoader(SIFLI_SDK,rtconfig.CHIP)
 
+# Add LCPU BLE image and embed it in the HCPU application.
+AddLCPU(SIFLI_SDK,rtconfig.CHIP)
+
 # Set default compile options
 SifliEnv()
 

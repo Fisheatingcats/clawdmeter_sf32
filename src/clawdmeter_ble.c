@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef CONFIG_BLUETOOTH
+#ifdef BLUETOOTH
 
 #include "bf0_ble_gap.h"
 #include "bf0_sibles.h"
@@ -18,10 +18,10 @@
 
 /* ════════════════════════════════════════════════════════════════════
  *  UUID definitions (little-endian byte arrays)
- *  Service:  6c415a55-4465-7669-6365-000000000001
- *  RX chr:   6c415a55-4465-7669-6365-000000000002  (write)
- *  TX chr:   6c415a55-4465-7669-6365-000000000003  (read + notify)
- *  Req chr:  6c415a55-4465-7669-6365-000000000004  (notify)
+ *  Service:  4c41555a-4465-7669-6365-000000000001
+ *  RX chr:   4c41555a-4465-7669-6365-000000000002  (write)
+ *  TX chr:   4c41555a-4465-7669-6365-000000000003  (read + notify)
+ *  Req chr:  4c41555a-4465-7669-6365-000000000004  (notify)
  * ════════════════════════════════════════════════════════════════════ */
 
 enum cm_att_list {
@@ -39,20 +39,21 @@ enum cm_att_list {
 
 static uint8_t svc_uuid[ATT_UUID_128_LEN] = {
     0x01,0x00,0x00,0x00, 0x00,0x00,0x65,0x63,
-    0x69,0x76,0x65,0x44, 0x55,0x5a,0x41,0x6c
+    0x69,0x76,0x65,0x44, 0x5a,0x55,0x41,0x4c
 };
-static uint8_t rx_uuid[ATT_UUID_128_LEN] = {
-    0x02,0x00,0x00,0x00, 0x00,0x00,0x65,0x63,
-    0x69,0x76,0x65,0x44, 0x55,0x5a,0x41,0x6c
-};
-static uint8_t tx_uuid[ATT_UUID_128_LEN] = {
-    0x03,0x00,0x00,0x00, 0x00,0x00,0x65,0x63,
-    0x69,0x76,0x65,0x44, 0x55,0x5a,0x41,0x6c
-};
-static uint8_t req_uuid[ATT_UUID_128_LEN] = {
-    0x04,0x00,0x00,0x00, 0x00,0x00,0x65,0x63,
-    0x69,0x76,0x65,0x44, 0x55,0x5a,0x41,0x6c
-};
+
+#define rx_chr_uuid { \
+    0x02,0x00,0x00,0x00, 0x00,0x00,0x65,0x63, \
+    0x69,0x76,0x65,0x44, 0x5a,0x55,0x41,0x4c  \
+}
+#define tx_chr_uuid { \
+    0x03,0x00,0x00,0x00, 0x00,0x00,0x65,0x63, \
+    0x69,0x76,0x65,0x44, 0x5a,0x55,0x41,0x4c  \
+}
+#define req_chr_uuid { \
+    0x04,0x00,0x00,0x00, 0x00,0x00,0x65,0x63, \
+    0x69,0x76,0x65,0x44, 0x5a,0x55,0x41,0x4c  \
+}
 
 #define SERIAL_UUID_16(x) {((uint8_t)(x&0xff)),((uint8_t)(x>>8))}
 
@@ -65,7 +66,7 @@ BLE_GATT_SERVICE_DEFINE_128(cm_att_db)
     /* ── RX characteristic (write from host) ── */
     BLE_GATT_CHAR_DECLARE(CM_RX_CHAR, SERIAL_UUID_16_CHARACTERISTIC,
                           BLE_GATT_PERM_READ_ENABLE),
-    BLE_GATT_CHAR_VALUE_DECLARE(CM_RX_VALUE, rx_uuid,
+    BLE_GATT_CHAR_VALUE_DECLARE(CM_RX_VALUE, rx_chr_uuid,
                                 BLE_GATT_PERM_WRITE_REQ_ENABLE |
                                 BLE_GATT_PERM_WRITE_COMMAND_ENABLE,
                                 BLE_GATT_VALUE_PERM_UUID_128 |
@@ -75,7 +76,7 @@ BLE_GATT_SERVICE_DEFINE_128(cm_att_db)
     /* ── TX characteristic (read + notify to host) ── */
     BLE_GATT_CHAR_DECLARE(CM_TX_CHAR, SERIAL_UUID_16_CHARACTERISTIC,
                           BLE_GATT_PERM_READ_ENABLE),
-    BLE_GATT_CHAR_VALUE_DECLARE(CM_TX_VALUE, tx_uuid,
+    BLE_GATT_CHAR_VALUE_DECLARE(CM_TX_VALUE, tx_chr_uuid,
                                 BLE_GATT_PERM_READ_ENABLE |
                                 BLE_GATT_PERM_NOTIFY_ENABLE,
                                 BLE_GATT_VALUE_PERM_UUID_128 |
@@ -89,7 +90,7 @@ BLE_GATT_SERVICE_DEFINE_128(cm_att_db)
     /* ── Request characteristic (notify to host) ── */
     BLE_GATT_CHAR_DECLARE(CM_REQ_CHAR, SERIAL_UUID_16_CHARACTERISTIC,
                           BLE_GATT_PERM_READ_ENABLE),
-    BLE_GATT_CHAR_VALUE_DECLARE(CM_REQ_VALUE, req_uuid,
+    BLE_GATT_CHAR_VALUE_DECLARE(CM_REQ_VALUE, req_chr_uuid,
                                 BLE_GATT_PERM_READ_ENABLE |
                                 BLE_GATT_PERM_NOTIFY_ENABLE,
                                 BLE_GATT_VALUE_PERM_UUID_128 |
@@ -115,6 +116,11 @@ static char       s_dev_name[32] = "Clawdmeter";
 static char       s_address[20] = "";  /* "XX:XX:XX:XX:XX:XX" */
 
 static rt_mailbox_t s_ble_mb;
+static rt_thread_t  s_ble_tid;
+static uint32_t     s_enable_tick;
+static bool         s_ble_timeout_logged;
+
+static void cm_ble_thread_entry(void *parameter);
 
 /* ════════════════════════════════════════════════════════════════════
  *  GATT callbacks
@@ -153,12 +159,13 @@ static uint8_t cm_gatts_set_cbk(uint8_t conn_idx, sibles_set_cbk_t *para)
             snprintf(s_last_tx, sizeof(s_last_tx), "{\"err\":true}");
             break;
         }
-        char buf[CM_JSON_MAX_LEN];
+        char buf[CM_JSON_MAX_LEN + 1];
         memcpy(buf, para->value, para->len);
         buf[para->len] = '\0';
 
         int rc = cm_data_update_json(buf, para->len);
         if (rc == 0) {
+            LOG_I("RX JSON accepted, len=%d gen=%u", para->len, cm_data_generation());
             snprintf(s_last_tx, sizeof(s_last_tx), "{\"ack\":true}");
         } else {
             LOG_W("JSON rejected");
@@ -203,10 +210,20 @@ static uint8_t cm_gatts_set_cbk(uint8_t conn_idx, sibles_set_cbk_t *para)
 static int cm_ble_event_handler(uint16_t event_id, uint8_t *data,
                                 uint16_t len, uint32_t context)
 {
+    static int cnt = 0;
+    cnt++;
+
+    rt_kprintf("[cm_ble] event=0x%04X cnt=%d\n", event_id, cnt);
+
     switch (event_id) {
     case BLE_POWER_ON_IND:
-        if (s_ble_mb)
-            rt_mb_send(s_ble_mb, (rt_uint32_t)BLE_POWER_ON_IND);
+        rt_kprintf("[cm_ble] BLE power on received!\n");
+        if (s_ble_mb) {
+            rt_err_t rc = rt_mb_send(s_ble_mb, (rt_uint32_t)BLE_POWER_ON_IND);
+            rt_kprintf("[cm_ble] mb_send result=%d\n", rc);
+        } else {
+            rt_kprintf("[cm_ble] ERROR: mb is NULL!\n");
+        }
         break;
 
     case BLE_GAP_CONNECTED_IND: {
@@ -231,6 +248,7 @@ static int cm_ble_event_handler(uint16_t event_id, uint8_t *data,
     }
     return 0;
 }
+
 BLE_EVENT_REGISTER(cm_ble_event_handler, NULL);
 
 /* ════════════════════════════════════════════════════════════════════
@@ -246,9 +264,12 @@ static void cm_ble_register_service(void)
                               svc_uuid);
 
     s_srv_handle = sibles_register_svc_128(&svc);
-    if (s_srv_handle)
+    if (s_srv_handle) {
         sibles_register_cbk(s_srv_handle, cm_gatts_get_cbk, cm_gatts_set_cbk);
-    LOG_I("GATT service registered, hdl=%d", s_srv_handle);
+        LOG_I("GATT service registered, hdl=%d", s_srv_handle);
+    } else {
+        LOG_E("GATT service register failed, hdl=0");
+    }
 }
 
 SIBLES_ADVERTISING_CONTEXT_DECLAR(cm_adv_ctx);
@@ -276,6 +297,11 @@ static void cm_ble_start_advertising(void)
 {
     sibles_advertising_para_t para = {0};
 
+    if (!s_srv_handle) {
+        LOG_E("GATT service missing, skip advertising");
+        return;
+    }
+
     /* Get and format MAC address */
     bd_addr_t addr;
     if (ble_get_public_address(&addr) == HL_ERR_NO_ERROR) {
@@ -285,17 +311,21 @@ static void cm_ble_start_advertising(void)
     }
 
     /* Build device name with MAC suffix for uniqueness */
-    char local_name[32];
+    char local_name[32] = {0};
     if (s_address[0]) {
         rt_snprintf(local_name, sizeof(local_name), "Clawdmeter-%02X%02X",
                     addr.addr[4], addr.addr[5]);
     } else {
-        memcpy(local_name, "Clawdmeter", 11);
+        rt_snprintf(local_name, sizeof(local_name), "Clawdmeter");
     }
-    memcpy(s_dev_name, local_name, sizeof(s_dev_name));
+    rt_snprintf(s_dev_name, sizeof(s_dev_name), "%s", local_name);
 
     /* Set device name */
     ble_gap_dev_name_t *dn = rt_malloc(sizeof(ble_gap_dev_name_t) + strlen(s_dev_name));
+    if (!dn) {
+        LOG_E("BLE device name alloc failed");
+        return;
+    }
     dn->len = (uint8_t)strlen(s_dev_name);
     memcpy(dn->name, s_dev_name, dn->len);
     ble_gap_set_dev_name(dn);
@@ -312,16 +342,38 @@ static void cm_ble_start_advertising(void)
 
     /* Name in scan response */
     para.rsp_data.completed_name = rt_malloc(strlen(s_dev_name) + sizeof(sibles_adv_type_name_t));
+    if (!para.rsp_data.completed_name) {
+        LOG_E("ADV name alloc failed");
+        return;
+    }
     para.rsp_data.completed_name->name_len = (uint8_t)strlen(s_dev_name);
     memcpy(para.rsp_data.completed_name->name, s_dev_name, strlen(s_dev_name));
+
+    para.adv_data.completed_uuid =
+        rt_malloc(sizeof(sibles_adv_type_srv_uuid_t) + sizeof(sibles_adv_uuid_t));
+    if (para.adv_data.completed_uuid) {
+        para.adv_data.completed_uuid->count = 1;
+        para.adv_data.completed_uuid->uuid_list[0].uuid_len = ATT_UUID_128_LEN;
+        memcpy(para.adv_data.completed_uuid->uuid_list[0].uuid.uuid_128,
+               svc_uuid, ATT_UUID_128_LEN);
+    } else {
+        LOG_E("ADV service UUID alloc failed");
+    }
 
     para.evt_handler = cm_adv_event;
 
     uint8_t ret = sibles_advertising_init(cm_adv_ctx, &para);
-    if (ret == SIBLES_ADV_NO_ERR)
-        sibles_advertising_start(cm_adv_ctx);
+    LOG_I("ADV init ret=%d", ret);
+    if (ret == SIBLES_ADV_NO_ERR) {
+        uint8_t start_ret = sibles_advertising_start(cm_adv_ctx);
+        LOG_I("ADV start ret=%d", start_ret);
+    } else {
+        LOG_E("ADV init failed, ret=%d", ret);
+    }
 
     rt_free(para.rsp_data.completed_name);
+    if (para.adv_data.completed_uuid)
+        rt_free(para.adv_data.completed_uuid);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -333,11 +385,26 @@ int cm_ble_init(void)
     if (s_initialized) return 0;
 
     s_ble_mb = rt_mb_create("cm_ble", 8, RT_IPC_FLAG_FIFO);
-    if (!s_ble_mb) return -1;
+    if (!s_ble_mb) {
+        LOG_E("BLE mailbox create failed");
+        return -1;
+    }
 
-    /* Enable BLE stack */
+    /* Enable BLE stack before allocating the app worker stack. */
+    LOG_I("sifli_ble_enable begin");
     sifli_ble_enable();
+    s_enable_tick = rt_tick_get();
     s_initialized = true;
+    LOG_I("sifli_ble_enable done");
+
+    s_ble_tid = rt_thread_create("cmble", cm_ble_thread_entry, NULL,
+                                 4096, RT_THREAD_PRIORITY_LOW, 10);
+    if (!s_ble_tid) {
+        LOG_E("BLE app thread create failed; main loop polling remains active");
+        return 0;
+    }
+    rt_thread_startup(s_ble_tid);
+    LOG_I("BLE app thread started, stack=4096");
     return 0;
 }
 
@@ -392,21 +459,43 @@ const char *cm_ble_address(void)
  * Process BLE events from the mailbox. Call this periodically
  * or after cm_ble_init() returns.
  */
+static bool s_ble_ready;
+
 void cm_ble_poll(void)
 {
     if (!s_ble_mb) return;
 
     rt_uint32_t msg;
     while (rt_mb_recv(s_ble_mb, &msg, RT_WAITING_NO) == RT_EOK) {
+        rt_kprintf("[cm_ble] poll got msg=0x%04X\n", (unsigned)msg);
         if (msg == BLE_POWER_ON_IND) {
-            LOG_I("BLE power on");
+            if (s_ble_ready) continue;
+            rt_kprintf("[cm_ble] Processing BLE_POWER_ON_IND\n");
+            s_ble_ready = true;
             cm_ble_register_service();
             cm_ble_start_advertising();
         }
     }
+
+    if (!s_ble_ready && s_initialized && s_enable_tick != 0 && !s_ble_timeout_logged) {
+        if (rt_tick_get() - s_enable_tick > rt_tick_from_millisecond(20000)) {
+            s_ble_timeout_logged = true;
+            rt_kprintf("[cm_ble] BLE_POWER_ON_IND timeout; waiting for BLE stack ready\n");
+        }
+    }
 }
 
-#ifndef NVDS_AUTO_UPDATE_MAC_ADDRESS_ENABLE
+static void cm_ble_thread_entry(void *parameter)
+{
+    (void)parameter;
+
+    while (1) {
+        cm_ble_poll();
+        rt_thread_mdelay(10);
+    }
+}
+
+#ifndef NVDS_AUTO_UPDATE_MAC_ADDRESS
 ble_common_update_type_t ble_request_public_address(bd_addr_t *addr)
 {
     int ret = bt_mac_addr_generate_via_uid_v2(addr);
@@ -418,7 +507,7 @@ ble_common_update_type_t ble_request_public_address(bd_addr_t *addr)
 }
 #endif
 
-#else /* !CONFIG_BLUETOOTH */
+#else /* !BLUETOOTH */
 
 /* ── Stubs when BLE is not enabled ── */
 
@@ -430,4 +519,4 @@ const char *cm_ble_device_name(void) { return "Clawdmeter"; }
 const char *cm_ble_address(void) { return "--:--:--:--:--:--"; }
 void cm_ble_poll(void) {}
 
-#endif /* CONFIG_BLUETOOTH */
+#endif /* BLUETOOTH */

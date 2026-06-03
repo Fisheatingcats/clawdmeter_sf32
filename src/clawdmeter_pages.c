@@ -8,6 +8,10 @@
 #include "rtthread.h"
 #include "lvgl.h"
 
+#ifdef BLUETOOTH
+#include "ble_connection_manager.h"
+#endif
+
 /* ── Asset includes ── */
 #include "clawdmeter_assets/icons.h"
 #include "clawdmeter_assets/logo_tca.h"
@@ -77,11 +81,78 @@ typedef struct {
     int16_t     cell;
     uint16_t    anim_idx;
     uint16_t    frame_idx;
+    uint32_t    last_generation;
     uint32_t    frame_elapsed_ms;
     uint32_t    rotate_elapsed_ms;
+    int8_t      remote_group;
+    uint8_t     remote_slot;
+    bool        remote_named;
 } splash_data_t;
 
 static splash_data_t s_splash;
+
+static void splash_render_frame(void);
+
+static const uint16_t s_anim_groups[4][4] = {
+    {0, 1, 3, 5},
+    {2, 8, 9, 8},
+    {7, 4, 6, 7},
+    {10, 11, 12, 10},
+};
+
+static uint16_t splash_find_anim(const char *name, uint16_t fallback)
+{
+    if (!name || !name[0]) return fallback;
+
+    for (uint16_t i = 0; i < SPLASH_ANIM_COUNT; ++i) {
+        if (strcmp(splash_anims[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return fallback;
+}
+
+static void splash_select_anim(uint16_t anim_idx)
+{
+    splash_data_t *d = &s_splash;
+    if (SPLASH_ANIM_COUNT == 0) return;
+
+    anim_idx = (uint16_t)(anim_idx % SPLASH_ANIM_COUNT);
+    if (d->anim_idx == anim_idx) return;
+
+    d->anim_idx = anim_idx;
+    d->frame_idx = 0;
+    d->frame_elapsed_ms = 0;
+    d->rotate_elapsed_ms = 0;
+    splash_render_frame();
+}
+
+static void splash_apply_remote_anim(void)
+{
+    cm_usage_data_t u;
+    if (!cm_data_get(&u) || u.generation == s_splash.last_generation) {
+        return;
+    }
+
+    s_splash.last_generation = u.generation;
+    if (u.anim_name[0]) {
+        s_splash.remote_group = -1;
+        s_splash.remote_named = true;
+        splash_select_anim(splash_find_anim(u.anim_name, s_splash.anim_idx));
+        return;
+    }
+
+    if (u.override_anim_group >= 0 && u.override_anim_group <= 3) {
+        s_splash.remote_group = u.override_anim_group;
+        uint16_t slot = (uint16_t)(u.generation % 4U);
+        s_splash.remote_slot = (uint8_t)slot;
+        s_splash.remote_named = false;
+        splash_select_anim(s_anim_groups[(uint8_t)u.override_anim_group][slot]);
+    } else {
+        s_splash.remote_group = -1;
+        s_splash.remote_named = false;
+    }
+}
 
 static lv_color_t cm_rgb565_to_color(uint16_t c)
 {
@@ -124,6 +195,7 @@ static void splash_create(lv_obj_t *parent)
 {
     splash_data_t *d = &s_splash;
     memset(d, 0, sizeof(*d));
+    d->remote_group = -1;
 
     int16_t min_dim = CM_SCR_W < CM_SCR_H ? CM_SCR_W : CM_SCR_H;
     d->cell = (int16_t)(min_dim / CM_GRID);
@@ -159,6 +231,8 @@ static void splash_tick(uint32_t elapsed_ms)
     splash_data_t *d = &s_splash;
     if (!d->canvas_buf || SPLASH_ANIM_COUNT == 0) return;
 
+    splash_apply_remote_anim();
+
     d->frame_elapsed_ms  += elapsed_ms;
     d->rotate_elapsed_ms += elapsed_ms;
 
@@ -173,7 +247,14 @@ static void splash_tick(uint32_t elapsed_ms)
 
     if (d->rotate_elapsed_ms >= CM_ANIM_ROTATE_MS) {
         d->rotate_elapsed_ms = 0;
-        d->anim_idx = (uint16_t)((d->anim_idx + 1U) % SPLASH_ANIM_COUNT);
+        if (d->remote_named) {
+            return;
+        } else if (d->remote_group >= 0 && d->remote_group <= 3) {
+            d->remote_slot = (uint8_t)((d->remote_slot + 1U) % 4U);
+            d->anim_idx = s_anim_groups[(uint8_t)d->remote_group][d->remote_slot];
+        } else {
+            d->anim_idx = (uint16_t)((d->anim_idx + 1U) % SPLASH_ANIM_COUNT);
+        }
         d->frame_idx = 0;
         d->frame_elapsed_ms = 0;
         splash_render_frame();
@@ -206,8 +287,10 @@ typedef struct {
     lv_obj_t *anim_label;
     uint32_t  spinner_elapsed_ms;
     uint32_t  message_elapsed_ms;
+    uint32_t  last_generation;
     uint8_t   spinner_idx;
     uint8_t   message_idx;
+    bool      has_data;
 } usage_data_t;
 
 static usage_data_t s_usage;
@@ -278,10 +361,78 @@ static void usage_create(lv_obj_t *parent)
     lv_obj_align(d->anim_label, LV_ALIGN_BOTTOM_MID, 0, -22);
 }
 
+static int usage_pct_to_int(float pct)
+{
+    if (pct < 0.0f) return 0;
+    if (pct > 100.0f) return 100;
+    return (int)(pct + 0.5f);
+}
+
+static void usage_set_reset_text(lv_obj_t *label, const char *prefix, int mins)
+{
+    if (mins < 0) {
+        lv_label_set_text_fmt(label, "%s reset: --", prefix);
+        return;
+    }
+
+    int hours = mins / 60;
+    int rem = mins % 60;
+    if (hours > 0) {
+        lv_label_set_text_fmt(label, "%s reset: %dh %dm", prefix, hours, rem);
+    } else {
+        lv_label_set_text_fmt(label, "%s reset: %dm", prefix, rem);
+    }
+}
+
+static void usage_apply_data(const cm_usage_data_t *u)
+{
+    usage_data_t *d = &s_usage;
+    int session_pct = usage_pct_to_int(u->session_pct);
+    int weekly_pct = usage_pct_to_int(u->weekly_pct);
+
+    lv_label_set_text_fmt(d->session_pct, "%d%%", session_pct);
+    lv_bar_set_value(d->session_bar, session_pct, LV_ANIM_OFF);
+    usage_set_reset_text(d->session_reset, "Session", u->session_reset_mins);
+
+    lv_label_set_text_fmt(d->weekly_pct, "%d%%", weekly_pct);
+    lv_bar_set_value(d->weekly_bar, weekly_pct, LV_ANIM_OFF);
+    usage_set_reset_text(d->weekly_reset, "Weekly", u->weekly_reset_mins);
+
+    if (u->message[0]) {
+        const char *agent = u->agent[0] ? u->agent : "agent";
+        lv_label_set_text_fmt(d->anim_label, "%s: %s", agent, u->message);
+    } else if (u->status[0]) {
+        lv_label_set_text_fmt(d->anim_label, "Status: %s", u->status);
+    } else {
+        lv_label_set_text(d->anim_label, "Data received");
+    }
+
+    if (strcmp(u->level, "error") == 0 || !u->ok) {
+        lv_obj_set_style_text_color(d->anim_label, CM_RED, 0);
+    } else if (strcmp(u->level, "warn") == 0 || strcmp(u->status, "warn") == 0) {
+        lv_obj_set_style_text_color(d->anim_label, CM_AMBER, 0);
+    } else {
+        lv_obj_set_style_text_color(d->anim_label, CM_ACCENT, 0);
+    }
+
+    rt_kprintf("[cm_ui] usage updated gen=%u session=%d weekly=%d msg=%s\n",
+               u->generation, session_pct, weekly_pct, u->message);
+}
+
 static void usage_tick(uint32_t elapsed_ms)
 {
     usage_data_t *d = &s_usage;
     if (!d->anim_label) return;
+
+    cm_usage_data_t u;
+    if (cm_data_get(&u)) {
+        if (!d->has_data || u.generation != d->last_generation) {
+            d->has_data = true;
+            d->last_generation = u.generation;
+            usage_apply_data(&u);
+        }
+        return;
+    }
 
     d->spinner_elapsed_ms += elapsed_ms;
     d->message_elapsed_ms += elapsed_ms;
@@ -323,7 +474,12 @@ static ble_data_t s_ble;
 
 static void ble_clear_bonds(void)
 {
-    rt_kprintf("BLE: clear bonds (stub)\n");
+#ifdef BLUETOOTH
+    connection_manager_delete_all_bond();
+    rt_kprintf("BLE: all bonds cleared\n");
+#else
+    rt_kprintf("BLE: not available\n");
+#endif
 }
 
 static void ble_reset_click_cb(lv_event_t *e)

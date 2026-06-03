@@ -16,6 +16,10 @@ Pop-Location
 
 Push-Location $ProjectDir
 scons --board=$Board
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    throw "scons failed with exit code $LASTEXITCODE"
+}
 Pop-Location
 
 if ($SkipDownload) {
@@ -41,4 +45,8 @@ Push-Location $BuildDir
     "bootloader\bootloader.bin@0x12010000" `
     "main.bin@0x12020000" `
     "ftab\ftab.bin@0x12000000"
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    throw "sftool failed with exit code $LASTEXITCODE"
+}
 Pop-Location
