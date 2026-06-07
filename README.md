@@ -22,7 +22,7 @@ Clawdmeter 是一个运行在手表/小屏设备上的 **AI Agent 用量监控�
 | UI 页面 | ✅ 已完成 | 3 个页面，LVGL 横向滚动 snap 切换 |
 | 像素动画 | ✅ 已完成 | 13 个动画，20 秒自动轮播 |
 | 自定义字体 | ✅ 已完成 | Styrene / Tiempos / Mono 共 9 个字号 |
-| BLE 通信 | 🔲 待开发 | 与 MCP 服务端的 GATT 数据交换 |
+| BLE 通信 | ✅ 已完成 | GATT Service（RX/TX/REQ），与 MCP 服务端双向通信 |
 | 麦克风接口 | 📋 计划中 | 预留音频采集能力 |
 | 喇叭接口 | 📋 计划中 | 预留音频播放能力 |
 
@@ -44,14 +44,14 @@ Clawdmeter 是一个运行在手表/小屏设备上的 **AI Agent 用量监控�
 - 顶部 Logo + "Usage" 标题
 - **Current** 面板：会话用量百分比 + 进度条 + 重置倒计时
 - **Weekly** 面板：每周用量百分比 + 进度条 + 重置倒计时
-- 底部动画状态文字（spinner 循环 + 旋转消息）
+- 底部状态消息栏：短文本居中，长文本自动连续滚动（不截断）
+- 颜色编码：绿色=正常、橙色=警告、红色=错误
 
 ### 3. Bluetooth — 连接状态
 
-- 蓝牙图标 + 连接状态（Connected / Advertising / Disconnected）
+- 蓝牙图标 + 连接状态（Connected / Advertising）
 - 设备名称、MAC 地址
 - 重置蓝牙按钮（垃圾桶图标 + "Reset Bluetooth"，点击清除配对并重新广播）
-- 底部版本信息
 
 ## 硬件平台
 
@@ -77,7 +77,11 @@ clawdmeter/
 │   ├── main.c                      # 入口，初始化 LVGL + Clawdmeter UI
 │   ├── clawdmeter_ui.h             # 页面管理器接口 + 颜色/尺寸常量
 │   ├── clawdmeter_ui.c             # LVGL scroll snap 页面管理
-│   ├── clawdmeter_pages.c          # 3 个页面实现
+│   ├── clawdmeter_pages.c          # 3 个页面实现（Splash / Usage / Bluetooth）
+│   ├── clawdmeter_ble.h            # BLE GATT 服务接口
+│   ├── clawdmeter_ble.c            # BLE 初始化、广播、RX/TX 数据收发
+│   ├── clawdmeter_data.h           # 共享数据结构（usage_data_t）
+│   ├── clawdmeter_data.c           # JSON 解析 + 状态管理 + 速率检测
 │   ├── clawdmeter_assets/
 │   │   ├── font_styrene_*.c        # Styrene 字体 (14/16/20/24/28/48px)
 │   │   ├── font_tiempos_*.c        # Tiempos 字体 (34/56px)
@@ -152,6 +156,19 @@ lv_obj_set_scroll_snap_x(scr, LV_SCROLL_SNAP_CENTER);
 ### 像素动画
 
 动画数据由 [claudepix.vercel.app](https://claudepix.vercel.app) 生成，格式为 20×20 网格 + 10 色 RGB565 调色板。每帧 400 字节，通过 `lv_canvas` 渲染到 PSRAM 缓冲区。
+
+### BLE 通信
+
+通过自定义 GATT Service 与 MCP 服务端通信：
+
+- **Service UUID**: `4c41555a-4465-7669-6365-000000000001`
+- **RX** (`...0002`): 接收 JSON 指令（最大 512 字节）
+- **TX** (`...0003`): 返回 `{"ack":true}` / `{"err":true}` 确认
+- **REQ** (`...0004`): 请求客户端刷新数据
+
+JSON payload 字段：`s`(session%), `w`(weekly%), `sr`/`wr`(重置分钟), `st`(状态), `agent`, `msg`, `level`, `ok`, `anim`(动画组 0-3), `anim_name`(动画名)。
+
+Splash 页面根据 `anim` / `anim_name` 切换像素动画；Usage 页面根据 `s`/`w` 更新进度条，消息栏自动滚动显示 `agent: msg`。
 
 ### 触摸驱动修复
 

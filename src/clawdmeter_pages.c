@@ -354,8 +354,8 @@ static void usage_create(lv_obj_t *parent)
     d->anim_label = lv_label_create(parent);
     lv_obj_set_style_text_color(d->anim_label, CM_ACCENT, 0);
     lv_obj_set_style_text_font(d->anim_label, &font_mono_32, 0);
+    lv_label_set_long_mode(d->anim_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_width(d->anim_label, CM_SCR_W - 40);
-    lv_label_set_long_mode(d->anim_label, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(d->anim_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(d->anim_label, ". Accomplishing...");
     lv_obj_align(d->anim_label, LV_ALIGN_BOTTOM_MID, 0, -22);
@@ -528,7 +528,7 @@ static void bluetooth_create(lv_obj_t *parent)
     /* Reset Bluetooth zone — trash icon + label */
     lv_obj_t *reset_zone = lv_obj_create(parent);
     lv_obj_set_pos(reset_zone, 20, 282);
-    lv_obj_set_size(reset_zone, 350, 90);
+    lv_obj_set_size(reset_zone, 350, 140);
     lv_obj_set_style_bg_color(reset_zone, CM_PANEL, 0);
     lv_obj_set_style_bg_opa(reset_zone, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(reset_zone, 8, 0);
@@ -547,12 +547,6 @@ static void bluetooth_create(lv_obj_t *parent)
     lv_label_set_text(reset_lbl, "Reset Bluetooth");
     lv_obj_set_style_text_font(reset_lbl, &font_styrene_20, 0);
     lv_obj_set_style_text_color(reset_lbl, CM_DIM, 0);
-
-    lv_obj_t *credit = lv_label_create(parent);
-    lv_obj_set_style_text_color(credit, CM_DIM, 0);
-    lv_obj_set_style_text_font(credit, &font_styrene_14, 0);
-    lv_label_set_text(credit, "Clawdmeter port scaffold");
-    lv_obj_align(credit, LV_ALIGN_BOTTOM_MID, 0, -24);
 }
 
 static void bluetooth_tick(uint32_t elapsed_ms)
