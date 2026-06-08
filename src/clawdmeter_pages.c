@@ -69,11 +69,47 @@ static void ensure_img_dsc_ready(void)
 }
 
 /* ════════════════════════════════════════════════════════════════════
- *  SPLASH PAGE — Pixel-art animation
+ *  SPLASH PAGE — Pixel-art animation + GIF support
  * ════════════════════════════════════════════════════════════════════ */
+
+/* ── GIF image declarations (clawd-on-desk state animations) ── */
+#if LV_USE_GIF
+#include "clawdmeter_assets/clawd_gifs/clawd_gifs.h"
+
+typedef struct {
+    const char *name;           /* animation/state name */
+    const void *gif_dsc;        /* lv_img_dsc_t* for GIF */
+} gif_entry_t;
+
+static const gif_entry_t s_gif_table[] = {
+    {"sleeping",     &clawd_sleeping_gif},
+    {"sweeping",     &clawd_sweeping_gif},
+    {"carrying",     &clawd_carrying_gif},
+    {"juggling",     &clawd_juggling_gif},
+    {"working",      &clawd_typing_gif},
+    {"thinking",     &clawd_thinking_gif},
+    {"notification", &clawd_notification_gif},
+    {"waking",       &clawd_sleeping_gif},
+    {"yawning",      &clawd_sleeping_gif},
+    {"dozing",       &clawd_sleeping_gif},
+    {"collapsing",   &clawd_sleeping_gif},
+};
+#define GIF_TABLE_COUNT (sizeof(s_gif_table) / sizeof(s_gif_table[0]))
+
+static const void *splash_find_gif(const char *name)
+{
+    if (!name || !name[0]) return NULL;
+    for (size_t i = 0; i < GIF_TABLE_COUNT; ++i) {
+        if (strcmp(s_gif_table[i].name, name) == 0)
+            return s_gif_table[i].gif_dsc;
+    }
+    return NULL;
+}
+#endif /* LV_USE_GIF */
 
 typedef struct {
     lv_obj_t  *canvas;
+    lv_obj_t  *gif;             /* lv_gif widget (NULL if not created) */
     lv_color_t *canvas_buf;
     lv_color_t *row_buf;
     int16_t     canvas_w;
@@ -87,6 +123,7 @@ typedef struct {
     int8_t      remote_group;
     uint8_t     remote_slot;
     bool        remote_named;
+    bool        gif_active;     /* true when GIF is playing instead of canvas */
 } splash_data_t;
 
 static splash_data_t s_splash;
@@ -135,6 +172,49 @@ static void splash_apply_remote_anim(void)
     }
 
     s_splash.last_generation = u.generation;
+
+    /* ── Try GIF first (clawd-on-desk state animations) ── */
+#if LV_USE_GIF
+    if (u.anim_name[0]) {
+        const void *gif_dsc = splash_find_gif(u.anim_name);
+        if (gif_dsc && s_splash.gif) {
+            /* Switch to GIF mode */
+            lv_gif_set_src(s_splash.gif, gif_dsc);
+            lv_obj_clear_flag(s_splash.gif, LV_OBJ_FLAG_HIDDEN);
+            if (s_splash.canvas)
+                lv_obj_add_flag(s_splash.canvas, LV_OBJ_FLAG_HIDDEN);
+            s_splash.gif_active = true;
+            s_splash.remote_named = true;
+            s_splash.remote_group = -1;
+            rt_kprintf("[cm_ui] GIF: %s\n", u.anim_name);
+            return;
+        }
+    }
+    /* Check if status field matches a GIF state (e.g. "sleeping", "working") */
+    if (u.status[0]) {
+        const void *gif_dsc = splash_find_gif(u.status);
+        if (gif_dsc && s_splash.gif) {
+            lv_gif_set_src(s_splash.gif, gif_dsc);
+            lv_obj_clear_flag(s_splash.gif, LV_OBJ_FLAG_HIDDEN);
+            if (s_splash.canvas)
+                lv_obj_add_flag(s_splash.canvas, LV_OBJ_FLAG_HIDDEN);
+            s_splash.gif_active = true;
+            s_splash.remote_named = true;
+            s_splash.remote_group = -1;
+            rt_kprintf("[cm_ui] GIF (status): %s\n", u.status);
+            return;
+        }
+    }
+#endif /* LV_USE_GIF */
+
+    /* ── No GIF match — fall back to pixel-art canvas ── */
+    if (s_splash.gif_active && s_splash.gif) {
+        lv_obj_add_flag(s_splash.gif, LV_OBJ_FLAG_HIDDEN);
+        if (s_splash.canvas)
+            lv_obj_clear_flag(s_splash.canvas, LV_OBJ_FLAG_HIDDEN);
+        s_splash.gif_active = false;
+    }
+
     if (u.anim_name[0]) {
         s_splash.remote_group = -1;
         s_splash.remote_named = true;
@@ -224,6 +304,14 @@ static void splash_create(lv_obj_t *parent)
         lv_label_set_text(lbl, "Clawdmeter\ncanvas alloc failed");
         lv_obj_center(lbl);
     }
+
+    /* ── Create GIF widget (hidden until a GIF state is triggered) ── */
+#if LV_USE_GIF
+    d->gif = lv_gif_create(parent);
+    lv_obj_center(d->gif);
+    lv_obj_add_flag(d->gif, LV_OBJ_FLAG_HIDDEN);
+    rt_kprintf("[cm_ui] GIF widget created\n");
+#endif
 }
 
 static void splash_tick(uint32_t elapsed_ms)
@@ -232,6 +320,9 @@ static void splash_tick(uint32_t elapsed_ms)
     if (!d->canvas_buf || SPLASH_ANIM_COUNT == 0) return;
 
     splash_apply_remote_anim();
+
+    /* Skip canvas rendering when GIF is playing */
+    if (d->gif_active) return;
 
     d->frame_elapsed_ms  += elapsed_ms;
     d->rotate_elapsed_ms += elapsed_ms;
